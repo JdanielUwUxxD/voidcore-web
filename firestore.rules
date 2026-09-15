@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users can read/create their own profile, but can NEVER write their own "role".
+    // Only an admin (editing directly in the Firebase console) can change roles.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.role == 'user';
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role;
+    }
+
+    // Anyone signed in can read events. Only admins can create/edit them.
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      // Admins can edit anything; signed-in users can only touch participantCount
+      // (handled through the join transaction) — enforced by only allowing the
+      // specific field admins use in the app, plus participantCount changes.
+      allow update: if isAdmin() ||
+        (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantCount']));
+
+      match /participants/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.auth.uid == userId;
+        allow update: if isSignedIn() && request.auth.uid == userId;
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}
