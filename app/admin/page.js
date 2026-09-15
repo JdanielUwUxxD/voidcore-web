@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   onSnapshot,
@@ -61,6 +62,11 @@ export default function AdminPage() {
     await updateDoc(doc(db, "events", ev.id), { whitelistOpen: !ev.whitelistOpen });
   }
 
+  async function deleteEvent(ev) {
+    if (!confirm(`¿Seguro que quieres borrar "${ev.name}"? Esto no se puede deshacer.`)) return;
+    await deleteDoc(doc(db, "events", ev.id));
+  }
+
   async function copyWhitelist(ev) {
     const snap = await getDocs(collection(db, "events", ev.id, "participants"));
     const nicks = snap.docs
@@ -112,6 +118,13 @@ export default function AdminPage() {
             </button>
             <button className="btn btn-ember" onClick={() => copyWhitelist(ev)}>
               {copiedFor === ev.id ? "¡Copiada!" : "Copiar whitelist"}
+            </button>
+            <button
+              className="btn btn-ghost"
+              style={{ borderColor: "#ff5a5a", color: "#ff9d9d" }}
+              onClick={() => deleteEvent(ev)}
+            >
+              Borrar evento
             </button>
           </div>
         </div>
