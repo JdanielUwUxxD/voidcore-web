@@ -54,28 +54,29 @@ export default function HomePage() {
         const status = full ? "full" : ev.whitelistOpen ? "wl" : "open";
         return (
           <Link key={ev.id} href={`/events/${ev.id}`} style={{ textDecoration: "none" }}>
-            <div
-              className={`card ${status}`}
-              style={
-                ev.imageUrl
-                  ? {
-                      backgroundImage: `linear-gradient(180deg, rgba(8,6,13,0.35), rgba(8,6,13,0.92)), url(${ev.imageUrl})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    }
-                  : undefined
-              }
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <h3 style={{ fontSize: 19 }}>{ev.name}</h3>
-                <span className="tag" style={{ color: "var(--text-hi)" }}>{ev.date}</span>
-              </div>
-              <p style={{ color: "var(--text-lo)", fontSize: 14, margin: "10px 0" }}>{ev.description}</p>
-              <div style={{ display: "flex", gap: 16 }}>
-                <span className={`tag ${full ? "" : "ok"}`}>
-                  {ev.participantCount || 0}/{ev.capacity} apuntados
-                </span>
-                {ev.whitelistOpen && <span className="tag ember">whitelist abierta</span>}
+            <div className={`card ${status}`} style={{ padding: 0, overflow: "hidden" }}>
+              {ev.imageUrl && (
+                <div
+                  style={{
+                    height: 120,
+                    backgroundImage: `url(${ev.imageUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                />
+              )}
+              <div style={{ padding: 22 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <h3 style={{ fontSize: 19 }}>{ev.name}</h3>
+                  <span className="tag" style={{ color: "var(--text-hi)" }}>{ev.date}</span>
+                </div>
+                <p style={{ color: "var(--text-lo)", fontSize: 14, margin: "10px 0" }}>{ev.description}</p>
+                <div style={{ display: "flex", gap: 16 }}>
+                  <span className={`tag ${full ? "" : "ok"}`}>
+                    {ev.participantCount || 0}/{ev.capacity} apuntados
+                  </span>
+                  {ev.whitelistOpen && <span className="tag ember">whitelist abierta</span>}
+                </div>
               </div>
             </div>
           </Link>
