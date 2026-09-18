@@ -2,6 +2,7 @@ import { Chakra_Petch, Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../lib/AuthContext";
 import Nav from "../components/Nav";
+import DiscordGate from "../components/DiscordGate";
 
 const display = Chakra_Petch({
   subsets: ["latin"],
@@ -21,7 +22,7 @@ export default function RootLayout({ children }) {
       <body className={`${display.variable} ${body.variable}`}>
         <AuthProvider>
           <Nav />
-          {children}
+          <DiscordGate>{children}</DiscordGate>
         </AuthProvider>
       </body>
     </html>
