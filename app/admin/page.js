@@ -127,7 +127,7 @@ export default function AdminPage() {
           </div>
           <div className="field">
             <label>Fecha</label>
-            <input required placeholder="ej. 20 sept - 8pm" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </div>
           <div className="field">
             <label>Cupo máximo</label>
