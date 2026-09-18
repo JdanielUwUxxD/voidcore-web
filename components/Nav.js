@@ -17,6 +17,7 @@ export default function Nav() {
       </Link>
       <div className="nav-links">
         {!loading && isAdmin && <span className="pill">admin</span>}
+        {!loading && user && <Link href="/ranking">Ranking</Link>}
         {!loading && isAdmin && <Link href="/admin">Panel</Link>}
         {!loading && user && (
           <button className="btn-ghost btn" onClick={() => signOut(auth)}>
