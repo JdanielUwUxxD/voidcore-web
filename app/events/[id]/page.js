@@ -16,7 +16,7 @@ import { useAuth } from "../../../lib/AuthContext";
 export default function EventPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { user, loading } = useAuth() || {};
+  const { user, profile, loading } = useAuth() || {};
   const [event, setEvent] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [myEntry, setMyEntry] = useState(null);
@@ -60,6 +60,7 @@ export default function EventPage() {
         }
         tx.set(doc(db, "events", id, "participants", user.uid), {
           email: user.email,
+          discordUsername: profile?.discordUsername || "",
           mcNick: "",
           joinedAt: Date.now(),
         });
@@ -141,6 +142,9 @@ export default function EventPage() {
             <div className="skin" key={p.id}>
               <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p.mcNick)}/48`} width={48} height={48} alt={p.mcNick} />
               <span>{p.mcNick}</span>
+              {p.discordUsername && (
+                <span style={{ color: "var(--rift)", fontSize: 9 }}>@{p.discordUsername}</span>
+              )}
             </div>
           ))}
         {participants.filter((p) => p.mcNick).length === 0 && (
