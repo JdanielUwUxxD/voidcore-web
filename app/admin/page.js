@@ -16,10 +16,29 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../lib/AuthContext";
 
+// Cloudinary (gratis, sin tarjeta) — reemplaza estos dos valores por los tuyos
+const CLOUDINARY_CLOUD_NAME = "rzk7kole";
+const CLOUDINARY_UPLOAD_PRESET = "voidcore_unsigned";
+
+async function uploadToCloudinary(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: "POST", body: formData }
+  );
+  if (!res.ok) throw new Error("upload failed");
+  const data = await res.json();
+  return data.secure_url;
+}
+
 export default function AdminPage() {
   const { user, isAdmin, loading } = useAuth() || {};
   const [events, setEvents] = useState([]);
   const [form, setForm] = useState({ name: "", description: "", date: "", capacity: 20 });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [copiedFor, setCopiedFor] = useState(null);
 
@@ -45,6 +64,10 @@ export default function AdminPage() {
   async function createEvent(e) {
     e.preventDefault();
     setBusy(true);
+    let imageUrl = "";
+    if (imageFile) {
+      imageUrl = await uploadToCloudinary(imageFile);
+    }
     await addDoc(collection(db, "events"), {
       name: form.name,
       description: form.description,
@@ -52,10 +75,20 @@ export default function AdminPage() {
       capacity: Number(form.capacity),
       participantCount: 0,
       whitelistOpen: false,
+      imageUrl,
       createdBy: user.uid,
     });
     setForm({ name: "", description: "", date: "", capacity: 20 });
+    setImageFile(null);
+    setImagePreview(null);
     setBusy(false);
+  }
+
+  function handleImagePick(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   }
 
   async function toggleWhitelist(ev) {
@@ -99,6 +132,17 @@ export default function AdminPage() {
           <div className="field">
             <label>Cupo máximo</label>
             <input type="number" min="1" required value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>Imagen de fondo (opcional)</label>
+            <input type="file" accept="image/*" onChange={handleImagePick} />
+            {imagePreview && (
+              <img
+                src={imagePreview}
+                alt="Vista previa"
+                style={{ marginTop: 10, maxWidth: "100%", maxHeight: 160, border: "1px solid var(--border)" }}
+              />
+            )}
           </div>
           <button className="btn" disabled={busy}>{busy ? "Creando..." : "Crear evento"}</button>
         </form>
