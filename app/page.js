@@ -5,6 +5,41 @@ import { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
+import { isPastEvent } from "../lib/eventDate";
+
+function EventCard({ ev }) {
+  const full = ev.capacity && (ev.participantCount || 0) >= ev.capacity;
+  const status = full ? "full" : ev.whitelistOpen ? "wl" : "open";
+  return (
+    <Link href={`/events/${ev.id}`} style={{ textDecoration: "none" }}>
+      <div className={`card ${status}`} style={{ padding: 0, overflow: "hidden" }}>
+        {ev.imageUrl && (
+          <div
+            style={{
+              height: 120,
+              backgroundImage: `url(${ev.imageUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+        )}
+        <div style={{ padding: 22 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <h3 style={{ fontSize: 19 }}>{ev.name}</h3>
+            <span className="tag" style={{ color: "var(--text-hi)" }}>{ev.date}</span>
+          </div>
+          <p style={{ color: "var(--text-lo)", fontSize: 14, margin: "10px 0" }}>{ev.description}</p>
+          <div style={{ display: "flex", gap: 16 }}>
+            <span className={`tag ${full ? "" : "ok"}`}>
+              {ev.participantCount || 0}/{ev.capacity} apuntados
+            </span>
+            {ev.whitelistOpen && <span className="tag ember">whitelist abierta</span>}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 export default function HomePage() {
   const { user, loading } = useAuth() || {};
@@ -37,51 +72,29 @@ export default function HomePage() {
     );
   }
 
+  const upcoming = events.filter((ev) => !isPastEvent(ev.date));
+  const past = events.filter((ev) => isPastEvent(ev.date)).reverse();
+
   return (
     <div className="wrap" style={{ paddingTop: 40 }}>
       <h1 className="display" style={{ fontSize: 30, marginBottom: 24 }}>Próximos eventos</h1>
 
       {loadingEvents && <p style={{ color: "var(--text-lo)" }}>Cargando...</p>}
 
-      {!loadingEvents && events.length === 0 && (
+      {!loadingEvents && upcoming.length === 0 && (
         <div className="empty">
-          Todavía no hay eventos creados.
+          Todavía no hay eventos próximos.
         </div>
       )}
 
-      {events.map((ev) => {
-        const full = ev.capacity && (ev.participantCount || 0) >= ev.capacity;
-        const status = full ? "full" : ev.whitelistOpen ? "wl" : "open";
-        return (
-          <Link key={ev.id} href={`/events/${ev.id}`} style={{ textDecoration: "none" }}>
-            <div className={`card ${status}`} style={{ padding: 0, overflow: "hidden" }}>
-              {ev.imageUrl && (
-                <div
-                  style={{
-                    height: 120,
-                    backgroundImage: `url(${ev.imageUrl})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                />
-              )}
-              <div style={{ padding: 22 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <h3 style={{ fontSize: 19 }}>{ev.name}</h3>
-                  <span className="tag" style={{ color: "var(--text-hi)" }}>{ev.date}</span>
-                </div>
-                <p style={{ color: "var(--text-lo)", fontSize: 14, margin: "10px 0" }}>{ev.description}</p>
-                <div style={{ display: "flex", gap: 16 }}>
-                  <span className={`tag ${full ? "" : "ok"}`}>
-                    {ev.participantCount || 0}/{ev.capacity} apuntados
-                  </span>
-                  {ev.whitelistOpen && <span className="tag ember">whitelist abierta</span>}
-                </div>
-              </div>
-            </div>
-          </Link>
-        );
-      })}
+      {upcoming.map((ev) => <EventCard key={ev.id} ev={ev} />)}
+
+      {past.length > 0 && (
+        <>
+          <h3 style={{ margin: "40px 0 16px", color: "var(--text-lo)" }}>Eventos anteriores</h3>
+          {past.map((ev) => <EventCard key={ev.id} ev={ev} />)}
+        </>
+      )}
     </div>
   );
 }
