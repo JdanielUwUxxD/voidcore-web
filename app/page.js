@@ -54,7 +54,18 @@ export default function HomePage() {
         const status = full ? "full" : ev.whitelistOpen ? "wl" : "open";
         return (
           <Link key={ev.id} href={`/events/${ev.id}`} style={{ textDecoration: "none" }}>
-            <div className={`card ${status}`}>
+            <div
+              className={`card ${status}`}
+              style={
+                ev.imageUrl
+                  ? {
+                      backgroundImage: `linear-gradient(180deg, rgba(8,6,13,0.35), rgba(8,6,13,0.92)), url(${ev.imageUrl})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }
+                  : undefined
+              }
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <h3 style={{ fontSize: 19 }}>{ev.name}</h3>
                 <span className="tag" style={{ color: "var(--text-hi)" }}>{ev.date}</span>
