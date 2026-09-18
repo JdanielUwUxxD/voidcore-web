@@ -77,7 +77,7 @@ export default function EventPage() {
     setBusy(true);
     await setDoc(
       doc(db, "events", id, "participants", user.uid),
-      { mcNick: nick.trim().slice(0, 12) },
+      { mcNick: nick.trim().slice(0, 20) },
       { merge: true }
     );
     setBusy(false);
@@ -115,12 +115,12 @@ export default function EventPage() {
           {event.whitelistOpen ? (
             <form onSubmit={saveNick} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
               <div className="field" style={{ marginBottom: 0, flex: 1 }}>
-                <label>Tu nick de Minecraft (máx. 12 caracteres)</label>
+                <label>Tu nick de Minecraft (máx. 20 caracteres)</label>
                 <input
                   placeholder={myEntry.mcNick || "ej. Steve123"}
                   value={nick}
-                  maxLength={12}
-                  onChange={(e) => setNick(e.target.value.slice(0, 12))}
+                  maxLength={20}
+                  onChange={(e) => setNick(e.target.value.slice(0, 20))}
                 />
               </div>
               <button className="btn btn-ember" disabled={busy}>
