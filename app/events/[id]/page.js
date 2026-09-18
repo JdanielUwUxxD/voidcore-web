@@ -77,7 +77,7 @@ export default function EventPage() {
     setBusy(true);
     await setDoc(
       doc(db, "events", id, "participants", user.uid),
-      { mcNick: nick.trim() },
+      { mcNick: nick.trim().slice(0, 12) },
       { merge: true }
     );
     setBusy(false);
@@ -85,6 +85,18 @@ export default function EventPage() {
 
   return (
     <div className="wrap" style={{ paddingTop: 40 }}>
+      {event.imageUrl && (
+        <div
+          style={{
+            height: 180,
+            marginBottom: 20,
+            backgroundImage: `linear-gradient(180deg, rgba(8,6,13,0.1), rgba(8,6,13,0.9)), url(${event.imageUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            border: "1px solid var(--border)",
+          }}
+        />
+      )}
       <h1 className="display" style={{ fontSize: 28 }}>{event.name}</h1>
       <p style={{ color: "var(--text-lo)", margin: "10px 0 4px" }}>{event.date}</p>
       <p style={{ margin: "14px 0 24px" }}>{event.description}</p>
@@ -103,11 +115,12 @@ export default function EventPage() {
           {event.whitelistOpen ? (
             <form onSubmit={saveNick} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
               <div className="field" style={{ marginBottom: 0, flex: 1 }}>
-                <label>Tu nick de Minecraft</label>
+                <label>Tu nick de Minecraft (máx. 12 caracteres)</label>
                 <input
                   placeholder={myEntry.mcNick || "ej. Steve123"}
                   value={nick}
-                  onChange={(e) => setNick(e.target.value)}
+                  maxLength={12}
+                  onChange={(e) => setNick(e.target.value.slice(0, 12))}
                 />
               </div>
               <button className="btn btn-ember" disabled={busy}>
