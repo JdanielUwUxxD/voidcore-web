@@ -21,6 +21,7 @@ export default function EventPage() {
   const [participants, setParticipants] = useState([]);
   const [myEntry, setMyEntry] = useState(null);
   const [nick, setNick] = useState("");
+  const [discord, setDiscord] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -76,9 +77,11 @@ export default function EventPage() {
   async function saveNick(e) {
     e.preventDefault();
     setBusy(true);
+    const cleanNick = nick.trim().slice(0, 20) || myEntry.mcNick || "";
+    const cleanDiscord = discord.trim() || myEntry.discordUsername || "";
     await setDoc(
       doc(db, "events", id, "participants", user.uid),
-      { mcNick: nick.trim().slice(0, 20) },
+      { mcNick: cleanNick, discordUsername: cleanDiscord },
       { merge: true }
     );
     setBusy(false);
@@ -114,8 +117,8 @@ export default function EventPage() {
         <div className="card open">
           <p style={{ marginBottom: 12 }}>Ya estás apuntado a este evento.</p>
           {event.whitelistOpen ? (
-            <form onSubmit={saveNick} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-              <div className="field" style={{ marginBottom: 0, flex: 1 }}>
+            <form onSubmit={saveNick}>
+              <div className="field">
                 <label>Tu nick de Minecraft (máx. 20 caracteres)</label>
                 <input
                   placeholder={myEntry.mcNick || "ej. Steve123"}
@@ -124,8 +127,16 @@ export default function EventPage() {
                   onChange={(e) => setNick(e.target.value.slice(0, 20))}
                 />
               </div>
+              <div className="field">
+                <label>Tu usuario de Discord</label>
+                <input
+                  placeholder={myEntry.discordUsername || "ej. steve.mc"}
+                  value={discord}
+                  onChange={(e) => setDiscord(e.target.value)}
+                />
+              </div>
               <button className="btn btn-ember" disabled={busy}>
-                {myEntry.mcNick ? "Actualizar" : "Guardar nick"}
+                {myEntry.mcNick ? "Actualizar" : "Guardar"}
               </button>
             </form>
           ) : (
@@ -135,16 +146,16 @@ export default function EventPage() {
       )}
 
       <h3 style={{ margin: "32px 0 4px" }}>Gente apuntada ({participants.length})</h3>
-      <div className="skins">
+      <div className="participants">
         {participants
           .filter((p) => p.mcNick)
           .map((p) => (
-            <div className="skin" key={p.id}>
-              <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p.mcNick)}/48`} width={48} height={48} alt={p.mcNick} />
-              <span>{p.mcNick}</span>
-              {p.discordUsername && (
-                <span style={{ color: "var(--rift)", fontSize: 9 }}>@{p.discordUsername}</span>
-              )}
+            <div className="participant" key={p.id}>
+              <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p.mcNick)}/40`} width={40} height={40} alt={p.mcNick} />
+              <div>
+                <div className="p-name">{p.mcNick}</div>
+                {p.discordUsername && <div className="p-discord">@{p.discordUsername}</div>}
+              </div>
             </div>
           ))}
         {participants.filter((p) => p.mcNick).length === 0 && (
