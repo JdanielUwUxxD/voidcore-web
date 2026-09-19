@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -258,13 +259,15 @@ export default function EventPage() {
         {participants
           .filter((p) => p.mcNick)
           .map((p) => (
-            <div className="participant" key={p.id}>
-              <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p.mcNick)}/40`} width={40} height={40} alt={p.mcNick} />
-              <div>
-                <div className="p-name">{p.mcNick}</div>
-                {p.discordUsername && <div className="p-discord">@{p.discordUsername}</div>}
+            <Link key={p.id} href={`/player/${p.id}`} style={{ textDecoration: "none" }}>
+              <div className="participant">
+                <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p.mcNick)}/40`} width={40} height={40} alt={p.mcNick} />
+                <div>
+                  <div className="p-name">{p.mcNick}</div>
+                  {p.discordUsername && <div className="p-discord">@{p.discordUsername}</div>}
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
         {participants.filter((p) => p.mcNick).length === 0 && (
           <p style={{ color: "var(--text-lo)", fontSize: 14 }}>Nadie ha puesto su nick todavía.</p>
