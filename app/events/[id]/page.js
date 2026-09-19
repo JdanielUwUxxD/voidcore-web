@@ -14,6 +14,7 @@ import {
 import { db } from "../../../lib/firebase";
 import { useAuth } from "../../../lib/AuthContext";
 import { isPastEvent } from "../../../lib/eventDate";
+import Loader from "../../../components/Loader";
 
 export default function EventPage() {
   const { id } = useParams();
@@ -51,7 +52,7 @@ export default function EventPage() {
     };
   }, [id, user]);
 
-  if (loading || !event) return null;
+  if (loading || !event) return <Loader />;
 
   if (!user) {
     router.push("/login");
