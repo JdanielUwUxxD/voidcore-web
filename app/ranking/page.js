@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { collection, collectionGroup, getDocs } from "firebase/firestore";
 import { db } from "../../lib/firebase";
@@ -65,22 +66,24 @@ export default function RankingPage() {
       {ranking && ranking.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {ranking.map((r, i) => (
-            <div key={r.uid} className="participant" style={{ justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ color: "var(--text-lo)", fontSize: 13, width: 22 }}>#{i + 1}</span>
-                <img src={`https://mc-heads.net/avatar/${encodeURIComponent(r.mcNick)}/40`} width={40} height={40} alt={r.mcNick} />
-                <div>
-                  <div className="p-name">{r.mcNick}</div>
-                  {r.discordUsername && <div className="p-discord">@{r.discordUsername}</div>}
+            <Link key={r.uid} href={`/player/${r.uid}`} style={{ textDecoration: "none" }}>
+              <div className="participant card-hover" style={{ justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ color: "var(--text-lo)", fontSize: 13, width: 22 }}>#{i + 1}</span>
+                  <img src={`https://mc-heads.net/avatar/${encodeURIComponent(r.mcNick)}/40`} width={40} height={40} alt={r.mcNick} />
+                  <div>
+                    <div className="p-name">{r.mcNick}</div>
+                    {r.discordUsername && <div className="p-discord">@{r.discordUsername}</div>}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {r.wins > 0 && (
+                    <span className="tag ember">🏆 {r.wins} {r.wins === 1 ? "victoria" : "victorias"}</span>
+                  )}
+                  <span className="tag ok">{r.played} {r.played === 1 ? "jugado" : "jugados"}</span>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {r.wins > 0 && (
-                  <span className="tag ember">🏆 {r.wins} {r.wins === 1 ? "victoria" : "victorias"}</span>
-                )}
-                <span className="tag ok">{r.played} {r.played === 1 ? "jugado" : "jugados"}</span>
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
