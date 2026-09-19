@@ -27,13 +27,21 @@ export default function RankingPage() {
         const data = d.data();
         if (!data.mcNick) return;
         const uid = d.id;
-        if (!byUser[uid]) byUser[uid] = { uid, count: 0, mcNick: "", discordUsername: "" };
-        byUser[uid].count += 1;
+        if (!byUser[uid]) byUser[uid] = { uid, played: 0, wins: 0, mcNick: "", discordUsername: "" };
+        byUser[uid].played += 1;
         byUser[uid].mcNick = data.mcNick;
         byUser[uid].discordUsername = data.discordUsername || byUser[uid].discordUsername;
       });
 
-      const sorted = Object.values(byUser).sort((a, b) => b.count - a.count);
+      eventsSnap.docs.forEach((d) => {
+        if (!pastEventIds.has(d.id)) return;
+        const winnerUid = d.data().winnerUid;
+        if (winnerUid && byUser[winnerUid]) {
+          byUser[winnerUid].wins += 1;
+        }
+      });
+
+      const sorted = Object.values(byUser).sort((a, b) => b.wins - a.wins || b.played - a.played);
       setRanking(sorted);
     })();
   }, [user]);
@@ -45,7 +53,7 @@ export default function RankingPage() {
     <div className="wrap" style={{ paddingTop: 40 }}>
       <h1 className="display" style={{ fontSize: 30, marginBottom: 8 }}>Ranking</h1>
       <p className="hint" style={{ marginBottom: 24 }}>
-        Cuántos eventos ya pasados ha jugado cada quien.
+        Eventos jugados y ganados, entre los eventos ya pasados.
       </p>
 
       {ranking === null && <Loader />}
@@ -66,7 +74,12 @@ export default function RankingPage() {
                   {r.discordUsername && <div className="p-discord">@{r.discordUsername}</div>}
                 </div>
               </div>
-              <span className="tag ok">{r.count} {r.count === 1 ? "evento" : "eventos"}</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                {r.wins > 0 && (
+                  <span className="tag ember">🏆 {r.wins} {r.wins === 1 ? "victoria" : "victorias"}</span>
+                )}
+                <span className="tag ok">{r.played} {r.played === 1 ? "jugado" : "jugados"}</span>
+              </div>
             </div>
           ))}
         </div>
