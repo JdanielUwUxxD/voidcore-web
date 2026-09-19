@@ -5,6 +5,7 @@ import { collection, collectionGroup, getDocs } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../lib/AuthContext";
 import { isPastEvent } from "../../lib/eventDate";
+import Loader from "../../components/Loader";
 
 export default function RankingPage() {
   const { user, loading } = useAuth() || {};
@@ -37,7 +38,8 @@ export default function RankingPage() {
     })();
   }, [user]);
 
-  if (loading || !user) return null;
+  if (loading) return <Loader />;
+  if (!user) return null;
 
   return (
     <div className="wrap" style={{ paddingTop: 40 }}>
@@ -46,7 +48,7 @@ export default function RankingPage() {
         Cuántos eventos ya pasados ha jugado cada quien.
       </p>
 
-      {ranking === null && <p style={{ color: "var(--text-lo)" }}>Cargando...</p>}
+      {ranking === null && <Loader />}
 
       {ranking && ranking.length === 0 && (
         <div className="empty">Todavía no hay eventos pasados con gente apuntada.</div>
