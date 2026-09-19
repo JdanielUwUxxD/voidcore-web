@@ -74,7 +74,6 @@ export default function HomePage() {
   }
 
   const upcoming = events.filter((ev) => !isPastEvent(ev.date));
-  const past = events.filter((ev) => isPastEvent(ev.date)).reverse();
 
   return (
     <div className="wrap" style={{ paddingTop: 40 }}>
@@ -89,13 +88,6 @@ export default function HomePage() {
       )}
 
       {upcoming.map((ev) => <EventCard key={ev.id} ev={ev} />)}
-
-      {past.length > 0 && (
-        <>
-          <h3 style={{ margin: "40px 0 16px", color: "var(--text-lo)" }}>Eventos anteriores</h3>
-          {past.map((ev) => <EventCard key={ev.id} ev={ev} />)}
-        </>
-      )}
     </div>
   );
 }
