@@ -6,13 +6,14 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
 import { isPastEvent } from "../lib/eventDate";
+import Loader from "../components/Loader";
 
 function EventCard({ ev }) {
   const full = ev.capacity && (ev.participantCount || 0) >= ev.capacity;
   const status = full ? "full" : ev.whitelistOpen ? "wl" : "open";
   return (
     <Link href={`/events/${ev.id}`} style={{ textDecoration: "none" }}>
-      <div className={`card ${status}`} style={{ padding: 0, overflow: "hidden" }}>
+      <div className={`card card-hover ${status}`} style={{ padding: 0, overflow: "hidden" }}>
         {ev.imageUrl && (
           <div
             style={{
@@ -56,7 +57,7 @@ export default function HomePage() {
     return () => unsub();
   }, [user]);
 
-  if (loading) return null;
+  if (loading) return <Loader />;
 
   if (!user) {
     return (
