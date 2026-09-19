@@ -26,6 +26,57 @@ html, body {
   min-height: 100vh;
 }
 
+/* ---- Starfield background ---- */
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.stars-layer {
+  position: absolute;
+  inset: -20%;
+  width: 140%;
+  height: 140%;
+  background-repeat: repeat;
+}
+.stars-1 {
+  background-image:
+    radial-gradient(1.4px 1.4px at 15% 20%, rgba(241,236,251,0.9), transparent),
+    radial-gradient(1px 1px at 60% 10%, rgba(241,236,251,0.7), transparent),
+    radial-gradient(1.2px 1.2px at 85% 60%, rgba(241,236,251,0.8), transparent),
+    radial-gradient(1px 1px at 30% 75%, rgba(241,236,251,0.6), transparent),
+    radial-gradient(1.4px 1.4px at 45% 45%, rgba(241,236,251,0.9), transparent),
+    radial-gradient(1px 1px at 75% 85%, rgba(241,236,251,0.6), transparent),
+    radial-gradient(1.1px 1.1px at 5% 55%, rgba(241,236,251,0.7), transparent);
+  background-size: 380px 380px;
+  animation: drift1 140s linear infinite, twinkle 4s ease-in-out infinite alternate;
+}
+.stars-2 {
+  background-image:
+    radial-gradient(1px 1px at 25% 35%, rgba(166,77,255,0.8), transparent),
+    radial-gradient(1px 1px at 70% 25%, rgba(255,122,61,0.7), transparent),
+    radial-gradient(0.8px 0.8px at 90% 80%, rgba(241,236,251,0.6), transparent),
+    radial-gradient(1px 1px at 40% 90%, rgba(166,77,255,0.7), transparent),
+    radial-gradient(0.8px 0.8px at 10% 10%, rgba(241,236,251,0.5), transparent);
+  background-size: 260px 260px;
+  animation: drift2 200s linear infinite reverse;
+  opacity: 0.7;
+}
+@keyframes drift1 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-380px, -380px); }
+}
+@keyframes drift2 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(260px, -260px); }
+}
+@keyframes twinkle {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
 h1, h2, h3, .display {
   font-family: var(--font-display), sans-serif;
   letter-spacing: 0.01em;
@@ -88,16 +139,17 @@ button {
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
   transition: transform 0.12s ease, background 0.12s ease;
 }
-.btn:hover { background: #b968ff; }
+.btn:hover { background: #b968ff; transform: translateY(-1px); box-shadow: 0 0 18px rgba(166, 77, 255, 0.5); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled:hover { transform: none; box-shadow: none; }
 .btn-ghost {
   background: transparent;
   color: var(--text-hi);
   border: 1px solid var(--border);
 }
-.btn-ghost:hover { border-color: var(--rift); background: transparent; }
+.btn-ghost:hover { border-color: var(--rift); background: transparent; box-shadow: 0 0 14px rgba(166, 77, 255, 0.25); }
 .btn-ember { background: var(--ember); border-color: var(--ember); color: #180a02; }
-.btn-ember:hover { background: #ff9563; }
+.btn-ember:hover { background: #ff9563; box-shadow: 0 0 18px rgba(255, 122, 61, 0.5); }
 .btn-block { width: 100%; }
 
 /* ---- Cards ---- */
@@ -111,6 +163,16 @@ button {
 .card.open { border-left-color: var(--ok); }
 .card.full { border-left-color: var(--text-lo); }
 .card.wl { border-left-color: var(--ember); }
+
+.card-hover {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  border-color: var(--rift-dim);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
 
 .tag {
   font-size: 11px;
@@ -173,6 +235,11 @@ button {
   background: var(--void-1);
   border: 1px solid var(--border);
   padding: 10px 12px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.participant:hover {
+  transform: translateY(-2px);
+  border-color: var(--rift-dim);
 }
 .participant img { image-rendering: pixelated; border: 1px solid var(--border); flex-shrink: 0; }
 .participant .p-name { font-size: 14px; font-weight: 600; color: var(--text-hi); }
@@ -194,4 +261,33 @@ button {
   text-align: center;
   padding: 60px 20px;
   color: var(--text-lo);
+}
+
+/* ---- Loader ---- */
+.loader-screen {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.void-loader {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--rift);
+  border-right-color: var(--ember);
+  animation: spin 0.85s linear infinite;
+  box-shadow: 0 0 22px rgba(166, 77, 255, 0.4);
+}
+.loader-label {
+  font-family: var(--font-display), sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--text-lo);
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
