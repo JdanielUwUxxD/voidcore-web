@@ -179,6 +179,9 @@ export default function EventPage() {
       {isPast && (
         <div className="card">
           <p className="hint">Este evento ya pasó. Aquí quedó quién participó.</p>
+          {event.winnerNick && (
+            <p style={{ color: "var(--ember)", fontSize: 15, marginTop: 10 }}>🏆 Ganador: {event.winnerNick}</p>
+          )}
         </div>
       )}
 
