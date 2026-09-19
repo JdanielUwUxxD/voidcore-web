@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../lib/AuthContext";
+import Loader from "../../components/Loader";
 
 // Cloudinary (gratis, sin tarjeta) — reemplaza estos dos valores por los tuyos
 const CLOUDINARY_CLOUD_NAME = "rzk7kole";
@@ -51,7 +52,7 @@ export default function AdminPage() {
     return () => unsub();
   }, [isAdmin]);
 
-  if (loading) return null;
+  if (loading) return <Loader />;
 
   if (!loading && !isAdmin) {
     return (
