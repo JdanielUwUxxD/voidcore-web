@@ -105,8 +105,10 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 24px;
+  padding: 20px 28px;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 .nav-brand {
   display: flex;
@@ -117,15 +119,41 @@ button {
   font-weight: 600;
 }
 .nav-brand .void { color: var(--rift); }
-.nav-links { display: flex; align-items: center; gap: 20px; font-size: 14px; }
-.nav-links a { color: var(--text-lo); text-decoration: none; }
-.nav-links a:hover { color: var(--text-hi); }
-.pill {
-  font-size: 12px;
-  padding: 3px 10px;
-  border: 1px solid var(--rift-dim);
-  color: var(--rift);
-  clip-path: polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px);
+.nav-links { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+.nav-link {
+  position: relative;
+  color: var(--text-lo);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 14px;
+  transition: color 0.15s ease;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 2px;
+  height: 2px;
+  background: var(--rift);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.18s ease;
+}
+.nav-link:hover { color: var(--text-hi); }
+.nav-link:hover::after { transform: scaleX(1); }
+.nav-link.active { color: var(--rift); }
+.nav-link.active::after { transform: scaleX(1); }
+
+.nav-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 10px;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
 }
 
 /* ---- Buttons ---- */
