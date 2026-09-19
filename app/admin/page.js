@@ -50,6 +50,32 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
   const [manualDiscord, setManualDiscord] = useState("");
   const [addingManual, setAddingManual] = useState(false);
 
+  const [showWinnerPicker, setShowWinnerPicker] = useState(false);
+  const [winnerOptions, setWinnerOptions] = useState([]);
+  const [selectedWinner, setSelectedWinner] = useState("");
+  const [savingWinner, setSavingWinner] = useState(false);
+
+  async function openWinnerPicker() {
+    const snap = await getDocs(collection(db, "events", ev.id, "participants"));
+    const list = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((p) => p.mcNick);
+    setWinnerOptions(list);
+    setSelectedWinner(ev.winnerUid || "");
+    setShowWinnerPicker(true);
+  }
+
+  async function saveWinner() {
+    setSavingWinner(true);
+    const picked = winnerOptions.find((p) => p.id === selectedWinner);
+    await updateDoc(doc(db, "events", ev.id), {
+      winnerUid: picked ? picked.id : "",
+      winnerNick: picked ? picked.mcNick : "",
+    });
+    setSavingWinner(false);
+    setShowWinnerPicker(false);
+  }
+
   async function saveEdit(e) {
     e.preventDefault();
     setSavingEdit(true);
@@ -128,6 +154,9 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
         <h3 style={{ fontSize: 18 }}>{ev.name}</h3>
         <span className="tag">{ev.participantCount || 0}/{ev.capacity}</span>
       </div>
+      {ev.winnerNick && (
+        <p style={{ color: "var(--ember)", fontSize: 13, marginTop: 6 }}>🏆 Ganador: {ev.winnerNick}</p>
+      )}
       <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
         <Link href={`/events/${ev.id}`} className="btn btn-ghost">Ver evento</Link>
         <button className="btn btn-ghost" onClick={() => setEditing(true)}>Editar</button>
@@ -137,6 +166,9 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
         <button className="btn btn-ember" onClick={() => onCopyWhitelist(ev)}>
           {copiedFor === ev.id ? "¡Copiada!" : "Copiar whitelist"}
         </button>
+        <button className="btn btn-ghost" onClick={openWinnerPicker}>
+          {ev.winnerNick ? "Cambiar ganador" : "Poner ganador"}
+        </button>
         <button
           className="btn btn-ghost"
           style={{ borderColor: "#ff5a5a", color: "#ff9d9d" }}
@@ -145,6 +177,37 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
           Borrar evento
         </button>
       </div>
+
+      {showWinnerPicker && (
+        <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div className="field" style={{ marginBottom: 0, flex: "1 1 200px" }}>
+            <label>Elige el ganador</label>
+            <select
+              value={selectedWinner}
+              onChange={(e) => setSelectedWinner(e.target.value)}
+              style={{
+                width: "100%",
+                background: "var(--void-2)",
+                border: "1px solid var(--border)",
+                color: "var(--text-hi)",
+                padding: "11px 12px",
+                fontSize: 14,
+              }}
+            >
+              <option value="">— sin ganador —</option>
+              {winnerOptions.map((p) => (
+                <option key={p.id} value={p.id}>{p.mcNick}</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn btn-ember" disabled={savingWinner} onClick={saveWinner}>
+            {savingWinner ? "Guardando..." : "Guardar"}
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setShowWinnerPicker(false)}>
+            Cancelar
+          </button>
+        </div>
+      )}
 
       <form onSubmit={addManual} style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div className="field" style={{ marginBottom: 0, flex: "1 1 140px" }}>
