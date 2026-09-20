@@ -35,7 +35,7 @@ export default function PlayerProfilePage() {
           const eventId = d.ref.parent.parent.id;
           const ev = eventsById[eventId];
           if (!ev) return null;
-          const past = isPastEvent(ev.date);
+          const past = isPastEvent(ev.date, ev.dateEnd);
           const won = past && ev.winnerUid === uid;
           if (won) wins += 1;
           return { id: eventId, name: ev.name, date: ev.date, past, won };
