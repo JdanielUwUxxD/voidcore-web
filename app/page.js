@@ -7,6 +7,7 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
 import { isPastEvent } from "../lib/eventDate";
 import Loader from "../components/Loader";
+import Countdown from "../components/Countdown";
 
 function EventCard({ ev }) {
   const full = ev.capacity && (ev.participantCount || 0) >= ev.capacity;
@@ -27,14 +28,17 @@ function EventCard({ ev }) {
         <div style={{ padding: 22 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <h3 style={{ fontSize: 19 }}>{ev.name}</h3>
-            <span className="tag" style={{ color: "var(--text-hi)" }}>{ev.date}</span>
+            <span className="tag" style={{ color: "var(--text-hi)" }}>
+              {ev.date}{ev.dateEnd ? ` — ${ev.dateEnd}` : ""}
+            </span>
           </div>
           <p style={{ color: "var(--text-lo)", fontSize: 14, margin: "10px 0" }}>{ev.description}</p>
-          <div style={{ display: "flex", gap: 16 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <span className={`tag ${full ? "" : "ok"}`}>
               {ev.participantCount || 0}/{ev.capacity} apuntados
             </span>
             {ev.whitelistOpen && <span className="tag ember">whitelist abierta</span>}
+            <Countdown target={ev.date} />
           </div>
         </div>
       </div>
@@ -73,7 +77,7 @@ export default function HomePage() {
     );
   }
 
-  const upcoming = events.filter((ev) => !isPastEvent(ev.date));
+  const upcoming = events.filter((ev) => !isPastEvent(ev.date, ev.dateEnd));
 
   return (
     <div className="wrap" style={{ paddingTop: 40 }}>
