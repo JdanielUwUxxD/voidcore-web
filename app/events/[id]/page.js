@@ -71,9 +71,13 @@ export default function EventPage() {
       setError("Pon tu nick de Minecraft.");
       return;
     }
+    const cleanNick = nick.trim().slice(0, 20);
+    if (participants.some((p) => p.id !== user.uid && p.mcNick && p.mcNick.trim().toLowerCase() === cleanNick.toLowerCase())) {
+      setError("Ese nick ya está apuntado a este evento por alguien más.");
+      return;
+    }
     setError("");
     setBusy(true);
-    const cleanNick = nick.trim().slice(0, 20);
     const cleanDiscord = discord.trim() || profile?.discordUsername || "";
     try {
       if (full) {
@@ -157,8 +161,13 @@ export default function EventPage() {
 
   async function saveNick(e) {
     e.preventDefault();
-    setBusy(true);
     const cleanNick = nick.trim().slice(0, 20) || myEntry.mcNick || "";
+    if (participants.some((p) => p.id !== user.uid && p.mcNick && p.mcNick.trim().toLowerCase() === cleanNick.toLowerCase())) {
+      setError("Ese nick ya está apuntado a este evento por alguien más.");
+      return;
+    }
+    setError("");
+    setBusy(true);
     const cleanDiscord = discord.trim() || myEntry.discordUsername || "";
     await setDoc(
       doc(db, "events", id, "participants", user.uid),
@@ -190,6 +199,12 @@ export default function EventPage() {
       </p>
       {!isPast && <div style={{ marginBottom: 4 }}><Countdown target={event.date} /></div>}
       <p style={{ margin: "14px 0 24px" }}>{event.description}</p>
+
+      {event.hasStatsHub && (
+        <Link href={`/events/${id}/stats`} className="btn btn-ember" style={{ marginBottom: 24 }}>
+          ⚔️ Ver kills, muertes y coras
+        </Link>
+      )}
 
       {error && <div className="error">{error}</div>}
 
