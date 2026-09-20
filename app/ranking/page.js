@@ -17,7 +17,7 @@ export default function RankingPage() {
     (async () => {
       const eventsSnap = await getDocs(collection(db, "events"));
       const pastEventIds = new Set(
-        eventsSnap.docs.filter((d) => isPastEvent(d.data().date)).map((d) => d.id)
+        eventsSnap.docs.filter((d) => isPastEvent(d.data().date, d.data().dateEnd)).map((d) => d.id)
       );
 
       const participantsSnap = await getDocs(collectionGroup(db, "participants"));
