@@ -12,6 +12,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
@@ -35,7 +36,23 @@ async function uploadToCloudinary(file) {
   return data.secure_url;
 }
 
-function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhitelist }) {
+function isDuplicateNick(list, nick, excludeId) {
+  const clean = nick.trim().toLowerCase();
+  return list.some(
+    (p) => p.id !== excludeId && p.mcNick && p.mcNick.trim().toLowerCase() === clean
+  );
+}
+
+const selectStyle = {
+  width: "100%",
+  background: "var(--void-2)",
+  border: "1px solid var(--border)",
+  color: "var(--text-hi)",
+  padding: "11px 12px",
+  fontSize: 14,
+};
+
+function EventAdminCard({ ev, allEvents, ranks, copiedFor, onToggleWhitelist, onDelete, onCopyWhitelist }) {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: ev.name,
@@ -43,6 +60,7 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
     date: ev.date,
     dateEnd: ev.dateEnd || "",
     capacity: ev.capacity,
+    hasStatsHub: !!ev.hasStatsHub,
   });
   const [editImageFile, setEditImageFile] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -50,11 +68,73 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
   const [manualNick, setManualNick] = useState("");
   const [manualDiscord, setManualDiscord] = useState("");
   const [addingManual, setAddingManual] = useState(false);
+  const [manualError, setManualError] = useState("");
+
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [participantsList, setParticipantsList] = useState([]);
+  const [playerRankMap, setPlayerRankMap] = useState({});
+  const [nickDrafts, setNickDrafts] = useState({});
+  const [rankDrafts, setRankDrafts] = useState({});
+  const [moveTarget, setMoveTarget] = useState({});
+  const [rowBusy, setRowBusy] = useState(null);
 
   const [showWinnerPicker, setShowWinnerPicker] = useState(false);
   const [winnerOptions, setWinnerOptions] = useState([]);
   const [selectedWinner, setSelectedWinner] = useState("");
   const [savingWinner, setSavingWinner] = useState(false);
+
+  async function loadParticipants() {
+    const snap = await getDocs(collection(db, "events", ev.id, "participants"));
+    const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    setParticipantsList(list);
+    const ranksSnap = await getDocs(collection(db, "playerRanks"));
+    const map = {};
+    ranksSnap.docs.forEach((d) => (map[d.id] = d.data().rankId));
+    setPlayerRankMap(map);
+    setShowParticipants(true);
+  }
+
+  async function saveParticipantNick(p) {
+    const newNick = (nickDrafts[p.id] ?? p.mcNick ?? "").trim().slice(0, 20);
+    if (!newNick) return;
+    if (isDuplicateNick(participantsList, newNick, p.id)) {
+      alert("Ese nick ya lo tiene otra persona en este evento.");
+      return;
+    }
+    setRowBusy(p.id);
+    await updateDoc(doc(db, "events", ev.id, "participants", p.id), { mcNick: newNick });
+    setParticipantsList((cur) => cur.map((x) => (x.id === p.id ? { ...x, mcNick: newNick } : x)));
+    setRowBusy(null);
+  }
+
+  async function saveParticipantRank(p) {
+    const rankId = rankDrafts[p.id] ?? (playerRankMap[p.id] || "");
+    setRowBusy(p.id);
+    if (!rankId) {
+      await deleteDoc(doc(db, "playerRanks", p.id)).catch(() => {});
+    } else {
+      await setDoc(doc(db, "playerRanks", p.id), { rankId });
+    }
+    setPlayerRankMap((cur) => ({ ...cur, [p.id]: rankId }));
+    setRowBusy(null);
+  }
+
+  async function moveParticipant(p) {
+    const targetId = moveTarget[p.id];
+    if (!targetId) return;
+    setRowBusy(p.id);
+    await addDoc(collection(db, "events", targetId, "participants"), {
+      mcNick: p.mcNick,
+      discordUsername: p.discordUsername || "",
+      manual: true,
+      joinedAt: Date.now(),
+    });
+    await updateDoc(doc(db, "events", targetId), { participantCount: increment(1) });
+    await deleteDoc(doc(db, "events", ev.id, "participants", p.id));
+    await updateDoc(doc(db, "events", ev.id), { participantCount: increment(-1) });
+    setParticipantsList((cur) => cur.filter((x) => x.id !== p.id));
+    setRowBusy(null);
+  }
 
   async function openWinnerPicker() {
     const snap = await getDocs(collection(db, "events", ev.id, "participants"));
@@ -86,6 +166,7 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
       date: editForm.date,
       dateEnd: editForm.dateEnd,
       capacity: Number(editForm.capacity),
+      hasStatsHub: editForm.hasStatsHub,
     };
     if (editImageFile) {
       updates.imageUrl = await uploadToCloudinary(editImageFile);
@@ -98,10 +179,19 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
 
   async function addManual(e) {
     e.preventDefault();
-    if (!manualNick.trim()) return;
+    setManualError("");
+    const cleanNick = manualNick.trim().slice(0, 20);
+    if (!cleanNick) return;
     setAddingManual(true);
+    const snap = await getDocs(collection(db, "events", ev.id, "participants"));
+    const existing = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (isDuplicateNick(existing, cleanNick, null)) {
+      setManualError("Ese nick ya está apuntado en este evento.");
+      setAddingManual(false);
+      return;
+    }
     await addDoc(collection(db, "events", ev.id, "participants"), {
-      mcNick: manualNick.trim().slice(0, 20),
+      mcNick: cleanNick,
       discordUsername: manualDiscord.trim(),
       manual: true,
       joinedAt: Date.now(),
@@ -141,6 +231,18 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
             <label>Reemplazar imagen (opcional)</label>
             <input type="file" accept="image/*" onChange={(e) => setEditImageFile(e.target.files?.[0] || null)} />
           </div>
+          <div className="field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              id={`stats-${ev.id}`}
+              checked={editForm.hasStatsHub}
+              onChange={(e) => setEditForm({ ...editForm, hasStatsHub: e.target.checked })}
+              style={{ width: "auto" }}
+            />
+            <label htmlFor={`stats-${ev.id}`} style={{ marginBottom: 0 }}>
+              Activar panel de estadísticas (kills / muertes / coras)
+            </label>
+          </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="btn btn-ember" disabled={savingEdit}>
               {savingEdit ? "Guardando..." : "Guardar cambios"}
@@ -175,6 +277,9 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
         <button className="btn btn-ghost" onClick={openWinnerPicker}>
           {ev.winnerNick ? "Cambiar ganador" : "Poner ganador"}
         </button>
+        <button className="btn btn-ghost" onClick={() => (showParticipants ? setShowParticipants(false) : loadParticipants())}>
+          {showParticipants ? "Ocultar participantes" : "Ver/editar participantes"}
+        </button>
         <button
           className="btn btn-ghost"
           style={{ borderColor: "#ff5a5a", color: "#ff9d9d" }}
@@ -188,18 +293,7 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
         <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div className="field" style={{ marginBottom: 0, flex: "1 1 200px" }}>
             <label>Elige el ganador</label>
-            <select
-              value={selectedWinner}
-              onChange={(e) => setSelectedWinner(e.target.value)}
-              style={{
-                width: "100%",
-                background: "var(--void-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-hi)",
-                padding: "11px 12px",
-                fontSize: 14,
-              }}
-            >
+            <select value={selectedWinner} onChange={(e) => setSelectedWinner(e.target.value)} style={selectStyle}>
               <option value="">— sin ganador —</option>
               {winnerOptions.map((p) => (
                 <option key={p.id} value={p.id}>{p.mcNick}</option>
@@ -212,6 +306,67 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
           <button type="button" className="btn btn-ghost" onClick={() => setShowWinnerPicker(false)}>
             Cancelar
           </button>
+        </div>
+      )}
+
+      {showParticipants && (
+        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          {participantsList.length === 0 && (
+            <p className="hint">Todavía nadie está apuntado.</p>
+          )}
+          {participantsList.map((p) => (
+            <div key={p.id} style={{ border: "1px solid var(--border)", padding: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div className="field" style={{ marginBottom: 0, flex: "1 1 140px" }}>
+                <label>Nick {p.manual ? "(manual)" : ""}</label>
+                <input
+                  value={nickDrafts[p.id] ?? p.mcNick ?? ""}
+                  maxLength={20}
+                  onChange={(e) => setNickDrafts((cur) => ({ ...cur, [p.id]: e.target.value }))}
+                />
+              </div>
+              <button className="btn btn-ghost" disabled={rowBusy === p.id} onClick={() => saveParticipantNick(p)}>
+                Guardar nick
+              </button>
+
+              <div className="field" style={{ marginBottom: 0, flex: "1 1 140px" }}>
+                <label>Rango</label>
+                <select
+                  value={rankDrafts[p.id] ?? (playerRankMap[p.id] || "")}
+                  onChange={(e) => setRankDrafts((cur) => ({ ...cur, [p.id]: e.target.value }))}
+                  style={selectStyle}
+                >
+                  <option value="">USER (por defecto)</option>
+                  {ranks.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button className="btn btn-ghost" disabled={rowBusy === p.id} onClick={() => saveParticipantRank(p)}>
+                Asignar rango
+              </button>
+
+              {p.manual && (
+                <>
+                  <div className="field" style={{ marginBottom: 0, flex: "1 1 140px" }}>
+                    <label>Mover a</label>
+                    <select
+                      value={moveTarget[p.id] || ""}
+                      onChange={(e) => setMoveTarget((cur) => ({ ...cur, [p.id]: e.target.value }))}
+                      style={selectStyle}
+                    >
+                      <option value="">— elige evento —</option>
+                      {allEvents.filter((e2) => e2.id !== ev.id).map((e2) => (
+                        <option key={e2.id} value={e2.id}>{e2.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="btn btn-ghost" disabled={rowBusy === p.id || !moveTarget[p.id]} onClick={() => moveParticipant(p)}>
+                    Mover
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -237,6 +392,68 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
           {addingManual ? "Agregando..." : "Agregar"}
         </button>
       </form>
+      {manualError && <div className="error" style={{ marginTop: 10 }}>{manualError}</div>}
+    </div>
+  );
+}
+
+function RanksCard({ ranks }) {
+  const [name, setName] = useState("");
+  const [color, setColor] = useState("#a64dff");
+  const [saving, setSaving] = useState(false);
+
+  async function createRank(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    await addDoc(collection(db, "ranks"), { name: name.trim(), color });
+    setName("");
+    setSaving(false);
+  }
+
+  async function deleteRank(id) {
+    if (!confirm("¿Borrar este rango? La gente que lo tenga vuelve a USER.")) return;
+    await deleteDoc(doc(db, "ranks", id));
+  }
+
+  return (
+    <div className="card">
+      <h3 style={{ marginBottom: 18 }}>Rangos de jugadores</h3>
+      <p className="hint" style={{ marginBottom: 16 }}>
+        Crea rangos con su color, y asígnaselos a cada quien desde "Ver/editar participantes" en cualquier evento.
+      </p>
+
+      {ranks.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+          {ranks.map((r) => (
+            <span
+              key={r.id}
+              className="tag"
+              style={{ border: `1px solid ${r.color}`, color: r.color, display: "flex", alignItems: "center", gap: 8 }}
+            >
+              {r.name}
+              <button
+                onClick={() => deleteRank(r.id)}
+                style={{ background: "none", border: "none", color: r.color, cursor: "pointer", padding: 0, fontSize: 13 }}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={createRank} style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div className="field" style={{ marginBottom: 0, flex: "1 1 160px" }}>
+          <label>Nombre del rango</label>
+          <input placeholder="ej. Fundador" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Color</label>
+          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ padding: 2, height: 44, width: 60 }} />
+        </div>
+        <button className="btn" disabled={saving}>{saving ? "Creando..." : "Crear rango"}</button>
+      </form>
     </div>
   );
 }
@@ -244,7 +461,8 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
 export default function AdminPage() {
   const { user, isAdmin, loading } = useAuth() || {};
   const [events, setEvents] = useState([]);
-  const [form, setForm] = useState({ name: "", description: "", date: "", dateEnd: "", capacity: 20 });
+  const [ranks, setRanks] = useState([]);
+  const [form, setForm] = useState({ name: "", description: "", date: "", dateEnd: "", capacity: 20, hasStatsHub: false });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -256,7 +474,13 @@ export default function AdminPage() {
     const unsub = onSnapshot(q, (snap) => {
       setEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    return () => unsub();
+    const unsubRanks = onSnapshot(collection(db, "ranks"), (snap) => {
+      setRanks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => {
+      unsub();
+      unsubRanks();
+    };
   }, [isAdmin]);
 
   if (loading) return <Loader />;
@@ -284,10 +508,11 @@ export default function AdminPage() {
       capacity: Number(form.capacity),
       participantCount: 0,
       whitelistOpen: false,
+      hasStatsHub: form.hasStatsHub,
       imageUrl,
       createdBy: user.uid,
     });
-    setForm({ name: "", description: "", date: "", dateEnd: "", capacity: 20 });
+    setForm({ name: "", description: "", date: "", dateEnd: "", capacity: 20, hasStatsHub: false });
     setImageFile(null);
     setImagePreview(null);
     setBusy(false);
@@ -357,15 +582,31 @@ export default function AdminPage() {
               />
             )}
           </div>
+          <div className="field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              id="new-stats"
+              checked={form.hasStatsHub}
+              onChange={(e) => setForm({ ...form, hasStatsHub: e.target.checked })}
+              style={{ width: "auto" }}
+            />
+            <label htmlFor="new-stats" style={{ marginBottom: 0 }}>
+              Activar panel de estadísticas (kills / muertes / coras)
+            </label>
+          </div>
           <button className="btn" disabled={busy}>{busy ? "Creando..." : "Crear evento"}</button>
         </form>
       </div>
+
+      <RanksCard ranks={ranks} />
 
       <h3 style={{ margin: "32px 0 16px" }}>Tus eventos</h3>
       {events.map((ev) => (
         <EventAdminCard
           key={ev.id}
           ev={ev}
+          allEvents={events}
+          ranks={ranks}
           copiedFor={copiedFor}
           onToggleWhitelist={toggleWhitelist}
           onDelete={deleteEvent}
