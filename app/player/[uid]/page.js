@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { collection, collectionGroup, getDocs } from "firebase/firestore";
+import { collection, collectionGroup, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 import { useAuth } from "../../../lib/AuthContext";
 import { isPastEvent } from "../../../lib/eventDate";
@@ -45,7 +45,14 @@ export default function PlayerProfilePage() {
 
       const played = history.filter((h) => h.past).length;
 
-      setProfile({ mcNick, discordUsername, wins, played, history });
+      let rank = null;
+      const rankAssignSnap = await getDoc(doc(db, "playerRanks", uid));
+      if (rankAssignSnap.exists()) {
+        const rankSnap = await getDoc(doc(db, "ranks", rankAssignSnap.data().rankId));
+        if (rankSnap.exists()) rank = { id: rankSnap.id, ...rankSnap.data() };
+      }
+
+      setProfile({ mcNick, discordUsername, wins, played, history, rank });
     })();
   }, [user, uid]);
 
@@ -72,7 +79,16 @@ export default function PlayerProfilePage() {
           style={{ imageRendering: "pixelated", border: "1px solid var(--border)" }}
         />
         <div>
-          <h1 className="display" style={{ fontSize: 26 }}>{profile.mcNick}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <h1 className="display" style={{ fontSize: 26 }}>{profile.mcNick}</h1>
+            {profile.rank ? (
+              <span className="tag" style={{ border: `1px solid ${profile.rank.color}`, color: profile.rank.color }}>
+                {profile.rank.name}
+              </span>
+            ) : (
+              <span className="tag">USER</span>
+            )}
+          </div>
           {profile.discordUsername && <div className="p-discord" style={{ marginTop: 6 }}>@{profile.discordUsername}</div>}
         </div>
       </div>
