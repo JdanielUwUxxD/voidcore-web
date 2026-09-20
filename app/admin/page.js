@@ -41,6 +41,7 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
     name: ev.name,
     description: ev.description,
     date: ev.date,
+    dateEnd: ev.dateEnd || "",
     capacity: ev.capacity,
   });
   const [editImageFile, setEditImageFile] = useState(null);
@@ -83,6 +84,7 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
       name: editForm.name,
       description: editForm.description,
       date: editForm.date,
+      dateEnd: editForm.dateEnd,
       capacity: Number(editForm.capacity),
     };
     if (editImageFile) {
@@ -124,8 +126,12 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
             <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
           </div>
           <div className="field">
-            <label>Fecha</label>
+            <label>Fecha de inicio</label>
             <input type="date" required value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>Fecha de fin (opcional)</label>
+            <input type="date" value={editForm.dateEnd} onChange={(e) => setEditForm({ ...editForm, dateEnd: e.target.value })} />
           </div>
           <div className="field">
             <label>Cupo máximo</label>
@@ -238,7 +244,7 @@ function EventAdminCard({ ev, copiedFor, onToggleWhitelist, onDelete, onCopyWhit
 export default function AdminPage() {
   const { user, isAdmin, loading } = useAuth() || {};
   const [events, setEvents] = useState([]);
-  const [form, setForm] = useState({ name: "", description: "", date: "", capacity: 20 });
+  const [form, setForm] = useState({ name: "", description: "", date: "", dateEnd: "", capacity: 20 });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -274,13 +280,14 @@ export default function AdminPage() {
       name: form.name,
       description: form.description,
       date: form.date,
+      dateEnd: form.dateEnd,
       capacity: Number(form.capacity),
       participantCount: 0,
       whitelistOpen: false,
       imageUrl,
       createdBy: user.uid,
     });
-    setForm({ name: "", description: "", date: "", capacity: 20 });
+    setForm({ name: "", description: "", date: "", dateEnd: "", capacity: 20 });
     setImageFile(null);
     setImagePreview(null);
     setBusy(false);
@@ -328,8 +335,12 @@ export default function AdminPage() {
             <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <div className="field">
-            <label>Fecha</label>
+            <label>Fecha de inicio</label>
             <input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>Fecha de fin (opcional)</label>
+            <input type="date" value={form.dateEnd} onChange={(e) => setForm({ ...form, dateEnd: e.target.value })} />
           </div>
           <div className="field">
             <label>Cupo máximo</label>
