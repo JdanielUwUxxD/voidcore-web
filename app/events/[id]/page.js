@@ -1,125 +1,327 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { collection, doc, increment, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "../../../../lib/firebase";
-import { useAuth } from "../../../../lib/AuthContext";
-import Loader from "../../../../components/Loader";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  increment,
+  onSnapshot,
+  runTransaction,
+  setDoc,
+} from "firebase/firestore";
+import { db } from "../../../lib/firebase";
+import { useAuth } from "../../../lib/AuthContext";
+import { isPastEvent } from "../../../lib/eventDate";
+import Loader from "../../../components/Loader";
+import Countdown from "../../../components/Countdown";
 
-function StatButton({ label, onClick, disabled }) {
-  return (
-    <button
-      className="btn-ghost btn"
-      style={{ padding: "4px 10px", fontSize: 13 }}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {label}
-    </button>
-  );
-}
-
-export default function EventStatsPage() {
+export default function EventPage() {
   const { id } = useParams();
-  const { user, isAdmin, loading } = useAuth() || {};
+  const router = useRouter();
+  const { user, profile, loading } = useAuth() || {};
   const [event, setEvent] = useState(null);
   const [participants, setParticipants] = useState([]);
-  const [stats, setStats] = useState({});
+  const [myEntry, setMyEntry] = useState(null);
+  const [waitlist, setWaitlist] = useState([]);
+  const [myWaitlistEntry, setMyWaitlistEntry] = useState(null);
+  const [nick, setNick] = useState("");
+  const [discord, setDiscord] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
     const unsubEvent = onSnapshot(doc(db, "events", id), (d) => setEvent({ id: d.id, ...d.data() }));
     const unsubParticipants = onSnapshot(collection(db, "events", id, "participants"), (snap) => {
-      setParticipants(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.mcNick));
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setParticipants(list);
+      setMyEntry(list.find((p) => p.id === user.uid) || null);
     });
-    const unsubStats = onSnapshot(collection(db, "events", id, "stats"), (snap) => {
-      const map = {};
-      snap.docs.forEach((d) => (map[d.id] = d.data()));
-      setStats(map);
+    const unsubWaitlist = onSnapshot(collection(db, "events", id, "waitlist"), (snap) => {
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+      setWaitlist(list);
+      setMyWaitlistEntry(list.find((w) => w.id === user.uid) || null);
     });
     return () => {
       unsubEvent();
       unsubParticipants();
-      unsubStats();
+      unsubWaitlist();
     };
   }, [id, user]);
 
   if (loading || !event) return <Loader />;
-  if (!user) return null;
 
-  async function bump(playerId, field, delta) {
-    const current = stats[playerId]?.[field] || 0;
-    if (current + delta < 0) return;
-    await setDoc(
-      doc(db, "events", id, "stats", playerId),
-      { [field]: increment(delta) },
-      { merge: true }
-    );
+  if (!user) {
+    router.push("/login");
+    return null;
   }
 
-  const rows = participants
-    .map((p) => ({
-      ...p,
-      kills: stats[p.id]?.kills || 0,
-      deaths: stats[p.id]?.deaths || 0,
-      hearts: stats[p.id]?.hearts || 0,
-    }))
-    .sort((a, b) => b.kills - a.kills);
+  const isPast = isPastEvent(event.date, event.dateEnd);
+  const full = event.capacity && (event.participantCount || 0) >= event.capacity;
+  const spotJustOpened = myWaitlistEntry && !full;
+
+  async function joinWithNick(e) {
+    e.preventDefault();
+    if (!nick.trim()) {
+      setError("Pon tu nick de Minecraft.");
+      return;
+    }
+    setError("");
+    setBusy(true);
+    const cleanNick = nick.trim().slice(0, 20);
+    const cleanDiscord = discord.trim() || profile?.discordUsername || "";
+    try {
+      if (full) {
+        await setDoc(doc(db, "events", id, "waitlist", user.uid), {
+          email: user.email,
+          mcNick: cleanNick,
+          discordUsername: cleanDiscord,
+          joinedAt: Date.now(),
+        });
+      } else {
+        await runTransaction(db, async (tx) => {
+          const eventRef = doc(db, "events", id);
+          const evSnap = await tx.get(eventRef);
+          const data = evSnap.data();
+          if ((data.participantCount || 0) >= data.capacity) {
+            throw new Error("full");
+          }
+          tx.set(doc(db, "events", id, "participants", user.uid), {
+            email: user.email,
+            discordUsername: cleanDiscord,
+            mcNick: cleanNick,
+            joinedAt: Date.now(),
+          });
+          tx.update(eventRef, { participantCount: increment(1) });
+        });
+      }
+      setNick("");
+      setDiscord("");
+    } catch (err) {
+      setError("El cupo se llenó justo ahora. Te anotamos en la lista de espera si quieres.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function leave() {
+    if (!confirm("¿Seguro que quieres salirte de este evento?")) return;
+    setBusy(true);
+    await deleteDoc(doc(db, "events", id, "participants", user.uid));
+    await runTransaction(db, async (tx) => {
+      const eventRef = doc(db, "events", id);
+      const evSnap = await tx.get(eventRef);
+      const current = evSnap.data().participantCount || 0;
+      tx.update(eventRef, { participantCount: Math.max(0, current - 1) });
+    });
+    setBusy(false);
+  }
+
+  async function claimSpot() {
+    setError("");
+    setBusy(true);
+    try {
+      await runTransaction(db, async (tx) => {
+        const eventRef = doc(db, "events", id);
+        const evSnap = await tx.get(eventRef);
+        const data = evSnap.data();
+        if ((data.participantCount || 0) >= data.capacity) {
+          throw new Error("full");
+        }
+        tx.set(doc(db, "events", id, "participants", user.uid), {
+          email: user.email,
+          discordUsername: myWaitlistEntry?.discordUsername || "",
+          mcNick: myWaitlistEntry?.mcNick || "",
+          joinedAt: Date.now(),
+        });
+        tx.update(eventRef, { participantCount: increment(1) });
+      });
+      await deleteDoc(doc(db, "events", id, "waitlist", user.uid));
+    } catch (err) {
+      setError("Alguien más tomó el cupo justo antes que tú. Sigues en la lista de espera.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function leaveWaitlist() {
+    setBusy(true);
+    await deleteDoc(doc(db, "events", id, "waitlist", user.uid));
+    setBusy(false);
+  }
+
+  async function saveNick(e) {
+    e.preventDefault();
+    setBusy(true);
+    const cleanNick = nick.trim().slice(0, 20) || myEntry.mcNick || "";
+    const cleanDiscord = discord.trim() || myEntry.discordUsername || "";
+    await setDoc(
+      doc(db, "events", id, "participants", user.uid),
+      { mcNick: cleanNick, discordUsername: cleanDiscord },
+      { merge: true }
+    );
+    setNick("");
+    setDiscord("");
+    setBusy(false);
+  }
 
   return (
     <div className="wrap" style={{ paddingTop: 40 }}>
-      <Link href={`/events/${id}`} className="hint" style={{ display: "inline-block", marginBottom: 14 }}>
-        ← Volver al evento
-      </Link>
-      <h1 className="display" style={{ fontSize: 28, marginBottom: 6 }}>⚔️ {event.name} — Stats</h1>
-      <p className="hint" style={{ marginBottom: 24 }}>
-        Kills, muertes y coras (corazones) de cada jugador.
+      {event.imageUrl && (
+        <div
+          style={{
+            height: 180,
+            marginBottom: 20,
+            backgroundImage: `linear-gradient(180deg, rgba(8,6,13,0.1), rgba(8,6,13,0.9)), url(${event.imageUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            border: "1px solid var(--border)",
+          }}
+        />
+      )}
+      <h1 className="display" style={{ fontSize: 28 }}>{event.name}</h1>
+      <p style={{ color: "var(--text-lo)", margin: "10px 0 4px" }}>
+        {event.date}{event.dateEnd ? ` — ${event.dateEnd}` : ""}
       </p>
+      {!isPast && <div style={{ marginBottom: 4 }}><Countdown target={event.date} /></div>}
+      <p style={{ margin: "14px 0 24px" }}>{event.description}</p>
 
-      {rows.length === 0 && <div className="empty">Todavía no hay nadie con nick puesto en este evento.</div>}
+      {error && <div className="error">{error}</div>}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {rows.map((p) => (
-          <div key={p.id} className="participant" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p.mcNick)}/40`} width={40} height={40} alt={p.mcNick} />
-              <div className="p-name">{p.mcNick}</div>
+      {isPast && (
+        <div className="card">
+          <p className="hint">Este evento ya pasó. Aquí quedó quién participó.</p>
+          {event.winnerNick && (
+            <p style={{ color: "var(--ember)", fontSize: 15, marginTop: 10 }}>🏆 Ganador: {event.winnerNick}</p>
+          )}
+        </div>
+      )}
+
+      {!isPast && !event.whitelistOpen && !myEntry && !myWaitlistEntry && (
+        <div className="card">
+          <p className="hint">La whitelist está cerrada por ahora. Espera a que se abra para apuntarte.</p>
+        </div>
+      )}
+
+      {!isPast && event.whitelistOpen && !myEntry && !myWaitlistEntry && (
+        <div className="card open">
+          <form onSubmit={joinWithNick}>
+            <div className="field">
+              <label>Tu nick de Minecraft (máx. 20 caracteres)</label>
+              <input
+                placeholder="ej. Steve123"
+                value={nick}
+                maxLength={20}
+                onChange={(e) => setNick(e.target.value.slice(0, 20))}
+              />
             </div>
-
-            <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span className="tag ok">⚔️ {p.kills}</span>
-                {isAdmin && (
-                  <>
-                    <StatButton label="−" onClick={() => bump(p.id, "kills", -1)} />
-                    <StatButton label="+" onClick={() => bump(p.id, "kills", 1)} />
-                  </>
-                )}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span className="tag" style={{ color: "#ff9d9d" }}>💀 {p.deaths}</span>
-                {isAdmin && (
-                  <>
-                    <StatButton label="−" onClick={() => bump(p.id, "deaths", -1)} />
-                    <StatButton label="+" onClick={() => bump(p.id, "deaths", 1)} />
-                  </>
-                )}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span className="tag ember">❤️ {p.hearts}</span>
-                {isAdmin && (
-                  <>
-                    <StatButton label="−" onClick={() => bump(p.id, "hearts", -1)} />
-                    <StatButton label="+" onClick={() => bump(p.id, "hearts", 1)} />
-                  </>
-                )}
-              </div>
+            <div className="field">
+              <label>Tu usuario de Discord</label>
+              <input
+                placeholder="ej. steve.mc"
+                value={discord}
+                onChange={(e) => setDiscord(e.target.value)}
+              />
             </div>
-          </div>
-        ))}
+            <button className="btn" disabled={busy}>
+              {busy ? "Apuntando..." : full ? "Anotarme en lista de espera" : "Apuntarme"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {!isPast && myWaitlistEntry && (
+        <div className="card wl">
+          {spotJustOpened ? (
+            <>
+              <p style={{ marginBottom: 12 }}>¡Se abrió un cupo! Ya puedes apuntarte.</p>
+              <button className="btn btn-ember" disabled={busy} onClick={claimSpot}>
+                {busy ? "Apuntando..." : "Tomar el cupo"}
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ marginBottom: 12 }}>
+                Estás en la lista de espera (posición {waitlist.findIndex((w) => w.id === user.uid) + 1} de {waitlist.length}).
+              </p>
+              <button className="btn btn-ghost" disabled={busy} onClick={leaveWaitlist}>
+                Salir de la lista de espera
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {!isPast && myEntry && (
+        <div className="card open">
+          <p style={{ marginBottom: 12 }}>Ya estás apuntado a este evento.</p>
+          {event.whitelistOpen ? (
+            <form onSubmit={saveNick}>
+              <div className="field">
+                <label>Tu nick de Minecraft (máx. 20 caracteres)</label>
+                <input
+                  placeholder={myEntry.mcNick || "ej. Steve123"}
+                  value={nick}
+                  maxLength={20}
+                  onChange={(e) => setNick(e.target.value.slice(0, 20))}
+                />
+              </div>
+              <div className="field">
+                <label>Tu usuario de Discord</label>
+                <input
+                  placeholder={myEntry.discordUsername || "ej. steve.mc"}
+                  value={discord}
+                  onChange={(e) => setDiscord(e.target.value)}
+                />
+              </div>
+              <button className="btn btn-ember" disabled={busy}>
+                Actualizar
+              </button>
+            </form>
+          ) : (
+            <p className="hint">Tu nick: {myEntry.mcNick}</p>
+          )}
+          <button
+            className="btn btn-ghost"
+            style={{ marginTop: 14, borderColor: "#ff5a5a", color: "#ff9d9d" }}
+            disabled={busy}
+            onClick={leave}
+          >
+            Salir del evento
+          </button>
+        </div>
+      )}
+
+      <h3 style={{ margin: "32px 0 4px" }}>Gente apuntada ({participants.length})</h3>
+      <div className="participants">
+        {participants
+          .filter((p) => p.mcNick)
+          .map((p) => (
+            <Link key={p.id} href={`/player/${p.id}`} style={{ textDecoration: "none" }}>
+              <div className="participant">
+                <img src={`https://mc-heads.net/avatar/${encodeURIComponent(p.mcNick)}/40`} width={40} height={40} alt={p.mcNick} />
+                <div>
+                  <div className="p-name">{p.mcNick}</div>
+                  {p.discordUsername && <div className="p-discord">@{p.discordUsername}</div>}
+                </div>
+              </div>
+            </Link>
+          ))}
+        {participants.filter((p) => p.mcNick).length === 0 && (
+          <p style={{ color: "var(--text-lo)", fontSize: 14 }}>Nadie ha puesto su nick todavía.</p>
+        )}
       </div>
+
+      {!isPast && waitlist.length > 0 && (
+        <p className="hint" style={{ marginTop: 16 }}>
+          {waitlist.length} {waitlist.length === 1 ? "persona" : "personas"} en lista de espera.
+        </p>
+      )}
     </div>
   );
 }
