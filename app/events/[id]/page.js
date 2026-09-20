@@ -16,6 +16,7 @@ import { db } from "../../../lib/firebase";
 import { useAuth } from "../../../lib/AuthContext";
 import { isPastEvent } from "../../../lib/eventDate";
 import Loader from "../../../components/Loader";
+import Countdown from "../../../components/Countdown";
 
 export default function EventPage() {
   const { id } = useParams();
@@ -60,7 +61,7 @@ export default function EventPage() {
     return null;
   }
 
-  const isPast = isPastEvent(event.date);
+  const isPast = isPastEvent(event.date, event.dateEnd);
   const full = event.capacity && (event.participantCount || 0) >= event.capacity;
   const spotJustOpened = myWaitlistEntry && !full;
 
@@ -184,7 +185,10 @@ export default function EventPage() {
         />
       )}
       <h1 className="display" style={{ fontSize: 28 }}>{event.name}</h1>
-      <p style={{ color: "var(--text-lo)", margin: "10px 0 4px" }}>{event.date}</p>
+      <p style={{ color: "var(--text-lo)", margin: "10px 0 4px" }}>
+        {event.date}{event.dateEnd ? ` — ${event.dateEnd}` : ""}
+      </p>
+      {!isPast && <div style={{ marginBottom: 4 }}><Countdown target={event.date} /></div>}
       <p style={{ margin: "14px 0 24px" }}>{event.description}</p>
 
       {error && <div className="error">{error}</div>}
