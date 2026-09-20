@@ -64,14 +64,22 @@ export default function EventPage() {
   const full = event.capacity && (event.participantCount || 0) >= event.capacity;
   const spotJustOpened = myWaitlistEntry && !full;
 
-  async function join() {
+  async function joinWithNick(e) {
+    e.preventDefault();
+    if (!nick.trim()) {
+      setError("Pon tu nick de Minecraft.");
+      return;
+    }
     setError("");
     setBusy(true);
+    const cleanNick = nick.trim().slice(0, 20);
+    const cleanDiscord = discord.trim() || profile?.discordUsername || "";
     try {
       if (full) {
         await setDoc(doc(db, "events", id, "waitlist", user.uid), {
           email: user.email,
-          discordUsername: profile?.discordUsername || "",
+          mcNick: cleanNick,
+          discordUsername: cleanDiscord,
           joinedAt: Date.now(),
         });
       } else {
@@ -84,13 +92,15 @@ export default function EventPage() {
           }
           tx.set(doc(db, "events", id, "participants", user.uid), {
             email: user.email,
-            discordUsername: profile?.discordUsername || "",
-            mcNick: "",
+            discordUsername: cleanDiscord,
+            mcNick: cleanNick,
             joinedAt: Date.now(),
           });
           tx.update(eventRef, { participantCount: increment(1) });
         });
       }
+      setNick("");
+      setDiscord("");
     } catch (err) {
       setError("El cupo se llenó justo ahora. Te anotamos en la lista de espera si quieres.");
     } finally {
@@ -124,8 +134,8 @@ export default function EventPage() {
         }
         tx.set(doc(db, "events", id, "participants", user.uid), {
           email: user.email,
-          discordUsername: myWaitlistEntry?.discordUsername || profile?.discordUsername || "",
-          mcNick: "",
+          discordUsername: myWaitlistEntry?.discordUsername || "",
+          mcNick: myWaitlistEntry?.mcNick || "",
           joinedAt: Date.now(),
         });
         tx.update(eventRef, { participantCount: increment(1) });
@@ -154,6 +164,8 @@ export default function EventPage() {
       { mcNick: cleanNick, discordUsername: cleanDiscord },
       { merge: true }
     );
+    setNick("");
+    setDiscord("");
     setBusy(false);
   }
 
@@ -186,10 +198,37 @@ export default function EventPage() {
         </div>
       )}
 
-      {!isPast && !myEntry && !myWaitlistEntry && (
-        <button className="btn" disabled={busy} onClick={join}>
-          {busy ? "Apuntando..." : full ? "Anotarme en lista de espera" : "Apuntarme"}
-        </button>
+      {!isPast && !event.whitelistOpen && !myEntry && !myWaitlistEntry && (
+        <div className="card">
+          <p className="hint">La whitelist está cerrada por ahora. Espera a que se abra para apuntarte.</p>
+        </div>
+      )}
+
+      {!isPast && event.whitelistOpen && !myEntry && !myWaitlistEntry && (
+        <div className="card open">
+          <form onSubmit={joinWithNick}>
+            <div className="field">
+              <label>Tu nick de Minecraft (máx. 20 caracteres)</label>
+              <input
+                placeholder="ej. Steve123"
+                value={nick}
+                maxLength={20}
+                onChange={(e) => setNick(e.target.value.slice(0, 20))}
+              />
+            </div>
+            <div className="field">
+              <label>Tu usuario de Discord</label>
+              <input
+                placeholder="ej. steve.mc"
+                value={discord}
+                onChange={(e) => setDiscord(e.target.value)}
+              />
+            </div>
+            <button className="btn" disabled={busy}>
+              {busy ? "Apuntando..." : full ? "Anotarme en lista de espera" : "Apuntarme"}
+            </button>
+          </form>
+        </div>
       )}
 
       {!isPast && myWaitlistEntry && (
@@ -237,11 +276,11 @@ export default function EventPage() {
                 />
               </div>
               <button className="btn btn-ember" disabled={busy}>
-                {myEntry.mcNick ? "Actualizar" : "Guardar"}
+                Actualizar
               </button>
             </form>
           ) : (
-            <p className="hint">La whitelist todavía no está abierta para este evento.</p>
+            <p className="hint">Tu nick: {myEntry.mcNick}</p>
           )}
           <button
             className="btn btn-ghost"
