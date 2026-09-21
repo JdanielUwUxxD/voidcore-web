@@ -89,7 +89,10 @@ function EventAdminCard({ ev, allEvents, ranks, copiedFor, onToggleWhitelist, on
     setParticipantsList(list);
     const ranksSnap = await getDocs(collection(db, "playerRanks"));
     const map = {};
-    ranksSnap.docs.forEach((d) => (map[d.id] = d.data().rankId));
+    ranksSnap.docs.forEach((d) => {
+      const data = d.data();
+      map[d.id] = data.rankIds || (data.rankId ? [data.rankId] : []);
+    });
     setPlayerRankMap(map);
     setShowParticipants(true);
   }
@@ -107,15 +110,15 @@ function EventAdminCard({ ev, allEvents, ranks, copiedFor, onToggleWhitelist, on
     setRowBusy(null);
   }
 
-  async function saveParticipantRank(p) {
-    const rankId = rankDrafts[p.id] ?? (playerRankMap[p.id] || "");
+  async function saveParticipantRanks(p) {
+    const rankIds = rankDrafts[p.id] ?? (playerRankMap[p.id] || []);
     setRowBusy(p.id);
-    if (!rankId) {
+    if (rankIds.length === 0) {
       await deleteDoc(doc(db, "playerRanks", p.id)).catch(() => {});
     } else {
-      await setDoc(doc(db, "playerRanks", p.id), { rankId });
+      await setDoc(doc(db, "playerRanks", p.id), { rankIds });
     }
-    setPlayerRankMap((cur) => ({ ...cur, [p.id]: rankId }));
+    setPlayerRankMap((cur) => ({ ...cur, [p.id]: rankIds }));
     setRowBusy(null);
   }
 
@@ -328,21 +331,44 @@ function EventAdminCard({ ev, allEvents, ranks, copiedFor, onToggleWhitelist, on
                 Guardar nick
               </button>
 
-              <div className="field" style={{ marginBottom: 0, flex: "1 1 140px" }}>
-                <label>Rango</label>
-                <select
-                  value={rankDrafts[p.id] ?? (playerRankMap[p.id] || "")}
-                  onChange={(e) => setRankDrafts((cur) => ({ ...cur, [p.id]: e.target.value }))}
-                  style={selectStyle}
-                >
-                  <option value="">USER (por defecto)</option>
-                  {ranks.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
+              <div className="field" style={{ marginBottom: 0, flex: "1 1 220px" }}>
+                <label>Rangos</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {ranks.length === 0 && <span className="hint">No has creado rangos todavía.</span>}
+                  {ranks.map((r) => {
+                    const current = rankDrafts[p.id] ?? (playerRankMap[p.id] || []);
+                    const checked = current.includes(r.id);
+                    return (
+                      <label
+                        key={r.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          fontSize: 12,
+                          border: `1px solid ${r.color}`,
+                          color: r.color,
+                          padding: "4px 9px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked ? [...current, r.id] : current.filter((x) => x !== r.id);
+                            setRankDrafts((cur) => ({ ...cur, [p.id]: next }));
+                          }}
+                          style={{ width: "auto" }}
+                        />
+                        {r.name}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-              <button className="btn btn-ghost" disabled={rowBusy === p.id} onClick={() => saveParticipantRank(p)}>
-                Asignar rango
+              <button className="btn btn-ghost" disabled={rowBusy === p.id} onClick={() => saveParticipantRanks(p)}>
+                Guardar rangos
               </button>
 
               {p.manual && (
