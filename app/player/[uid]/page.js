@@ -45,14 +45,16 @@ export default function PlayerProfilePage() {
 
       const played = history.filter((h) => h.past).length;
 
-      let rank = null;
+      let ranksList = [];
       const rankAssignSnap = await getDoc(doc(db, "playerRanks", uid));
       if (rankAssignSnap.exists()) {
-        const rankSnap = await getDoc(doc(db, "ranks", rankAssignSnap.data().rankId));
-        if (rankSnap.exists()) rank = { id: rankSnap.id, ...rankSnap.data() };
+        const data = rankAssignSnap.data();
+        const ids = data.rankIds || (data.rankId ? [data.rankId] : []);
+        const fetched = await Promise.all(ids.map((rid) => getDoc(doc(db, "ranks", rid))));
+        ranksList = fetched.filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }));
       }
 
-      setProfile({ mcNick, discordUsername, wins, played, history, rank });
+      setProfile({ mcNick, discordUsername, wins, played, history, ranks: ranksList });
     })();
   }, [user, uid]);
 
@@ -79,17 +81,23 @@ export default function PlayerProfilePage() {
           style={{ imageRendering: "pixelated", border: "1px solid var(--border)" }}
         />
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <h1 className="display" style={{ fontSize: 26 }}>{profile.mcNick}</h1>
-            {profile.rank ? (
-              <span className="tag" style={{ border: `1px solid ${profile.rank.color}`, color: profile.rank.color }}>
-                {profile.rank.name}
-              </span>
+          <h1 className="display" style={{ fontSize: 26, marginBottom: 8 }}>{profile.mcNick}</h1>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {profile.ranks.length > 0 ? (
+              profile.ranks.map((r) => (
+                <span
+                  key={r.id}
+                  className="rank-badge"
+                  style={{ background: r.color, color: "#0a0612", boxShadow: `0 0 16px ${r.color}88` }}
+                >
+                  {r.name}
+                </span>
+              ))
             ) : (
               <span className="tag">USER</span>
             )}
           </div>
-          {profile.discordUsername && <div className="p-discord" style={{ marginTop: 6 }}>@{profile.discordUsername}</div>}
+          {profile.discordUsername && <div className="p-discord" style={{ marginTop: 8 }}>@{profile.discordUsername}</div>}
         </div>
       </div>
 
